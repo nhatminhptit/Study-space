@@ -1,0 +1,14 @@
+/* nen trang dang nhap / dang ky */
+.auth-page {
+  background: linear-gradient(135deg, var(--primary-soft), var(--bg) 60%);
+}
+
+.auth-page h1 {
+  font-size: 22px;
+  margin-bottom: 4px;
+}
+
+.auth-switch {
+  text-align: center;
+  font-size: 13px;
+}
