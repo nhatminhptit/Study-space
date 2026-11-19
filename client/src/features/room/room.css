@@ -1,0 +1,192 @@
+/* khong gian phong hoc: header phong / tab / (vung lam viec | sidebar) */
+.room {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+
+.room-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 16px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+}
+
+.room-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.room-title h2 {
+  font-size: 16px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.room-title .back {
+  padding: 4px 10px;
+  font-size: 16px;
+}
+
+.room-header-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.room-tabs,
+.side-tabs {
+  display: flex;
+  gap: 2px;
+  padding: 0 12px;
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+}
+
+.room-tab {
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  color: var(--muted);
+  padding: 10px 12px;
+}
+
+.room-tab:hover {
+  color: var(--text);
+}
+
+.room-tab.active {
+  color: var(--primary);
+  border-bottom-color: var(--primary);
+  font-weight: 600;
+}
+
+.room-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+.room-stage {
+  flex: 1;
+  min-width: 0;
+  position: relative;
+}
+
+.room-panel {
+  position: absolute;
+  inset: 0;
+}
+
+/* hidden phai thang display cua .room-panel */
+.room-panel[hidden],
+.side-panel[hidden],
+.room-sidebar[hidden] {
+  display: none;
+}
+
+.room-sidebar {
+  width: 340px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--panel);
+  border-left: 1px solid var(--border);
+}
+
+.side-tabs {
+  padding: 0 4px 0 8px;
+}
+
+.close-sidebar {
+  margin-left: auto;
+  padding: 4px 8px;
+}
+
+.side-content {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+}
+
+.side-panel {
+  position: absolute;
+  inset: 0;
+  overflow: auto;
+}
+
+/* thanh vien */
+.members {
+  padding: 12px 16px;
+}
+
+.members h4 {
+  margin: 8px 0;
+  font-size: 12px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.members ul {
+  list-style: none;
+  margin: 0 0 8px;
+  padding: 0;
+}
+
+.members li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+}
+
+.member-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.member-name em {
+  color: var(--muted);
+  font-style: normal;
+}
+
+/* man hinh hep: sidebar de len vung lam viec */
+@media (max-width: 900px) {
+  .room-sidebar {
+    position: absolute;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    width: min(340px, 100%);
+    z-index: 10;
+    box-shadow: -4px 0 16px rgb(15 23 42 / 0.12);
+  }
+
+  .room-body {
+    position: relative;
+  }
+
+}
+
+@media (max-width: 560px) {
+  .room-header {
+    padding: 8px;
+  }
+
+  .room-title .room-code {
+    display: none;
+  }
+}
