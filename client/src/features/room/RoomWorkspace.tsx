@@ -1,22 +1,23 @@
-import { useState, type ReactNode } from 'react'
-import { Link } from 'react-router'
-import CopyButton from '../../components/CopyButton'
-import type { Room } from '../../services/rooms'
-import MindmapPanel from '../mindmap/MindmapPanel'
-import MembersPanel from './MembersPanel'
-import './room.css'
+import { useState, type ReactNode } from "react";
+import { Link } from "react-router";
+import CopyButton from "../../components/CopyButton";
+import type { Room } from "../../services/rooms";
+import MindmapPanel from "../mindmap/MindmapPanel";
+import WhiteboardPanel from "../whiteboard/WhiteboardPanel";
+import MembersPanel from "./MembersPanel";
+import "./room.css";
 
-type MainTab = 'whiteboard' | 'mindmap' | 'flashcard'
-type SideTab = 'chat' | 'members'
+type MainTab = "whiteboard" | "mindmap" | "flashcard";
+type SideTab = "chat" | "members";
 
 const MAIN_TABS: { id: MainTab; label: string }[] = [
-  { id: 'whiteboard', label: 'Bảng trắng' },
-  { id: 'mindmap', label: 'Sơ đồ tư duy' },
-  { id: 'flashcard', label: 'Flashcard' },
-]
+  { id: "whiteboard", label: "Bảng trắng" },
+  { id: "mindmap", label: "Sơ đồ tư duy" },
+  { id: "flashcard", label: "Flashcard" },
+];
 
 function Placeholder({ title }: { title: string }) {
-  return <div className="placeholder">{title} – đang phát triển</div>
+  return <div className="placeholder">{title} – đang phát triển</div>;
 }
 
 /*
@@ -24,33 +25,39 @@ function Placeholder({ title }: { title: string }) {
  * Cac task sau gan component that vao: bang trang, mindmap, flashcard, chat.
  */
 export default function RoomWorkspace({ room }: { room: Room }) {
-  const [tab, setTab] = useState<MainTab>('whiteboard')
+  const [tab, setTab] = useState<MainTab>("whiteboard");
   // giu cac tab da mo de khong mat trang thai khi chuyen tab
-  const [visited, setVisited] = useState<Set<MainTab>>(() => new Set(['whiteboard']))
-  const [sideTab, setSideTab] = useState<SideTab>('chat')
-  const [sidebarOpen, setSidebarOpen] = useState(() => window.innerWidth > 900)
+  const [visited, setVisited] = useState<Set<MainTab>>(
+    () => new Set(["whiteboard"]),
+  );
+  const [sideTab, setSideTab] = useState<SideTab>("chat");
+  const [sidebarOpen, setSidebarOpen] = useState(() => window.innerWidth > 900);
 
   function openTab(next: MainTab) {
-    setTab(next)
-    setVisited((prev) => (prev.has(next) ? prev : new Set(prev).add(next)))
+    setTab(next);
+    setVisited((prev) => (prev.has(next) ? prev : new Set(prev).add(next)));
   }
 
   function showSide(next: SideTab) {
-    setSideTab(next)
-    setSidebarOpen(true)
+    setSideTab(next);
+    setSidebarOpen(true);
   }
 
   const panels: Record<MainTab, ReactNode> = {
-    whiteboard: <Placeholder title="Bảng trắng" />,
+    whiteboard: <WhiteboardPanel roomId={room.id} />,
     mindmap: <MindmapPanel />,
     flashcard: <Placeholder title="Flashcard" />,
-  }
+  };
 
   return (
     <div className="room">
       <header className="room-header">
         <div className="room-title">
-          <Link to="/rooms" className="button ghost back" aria-label="Về danh sách phòng">
+          <Link
+            to="/rooms"
+            className="button ghost back"
+            aria-label="Về danh sách phòng"
+          >
             ←
           </Link>
           <h2 title={room.name}>{room.name}</h2>
@@ -63,8 +70,10 @@ export default function RoomWorkspace({ room }: { room: Room }) {
         <div className="room-header-right">
           <button
             type="button"
-            className={sidebarOpen ? 'primary' : ''}
-            onClick={() => (sidebarOpen ? setSidebarOpen(false) : showSide(sideTab))}
+            className={sidebarOpen ? "primary" : ""}
+            onClick={() =>
+              sidebarOpen ? setSidebarOpen(false) : showSide(sideTab)
+            }
             aria-pressed={sidebarOpen}
           >
             Chat
@@ -79,7 +88,7 @@ export default function RoomWorkspace({ room }: { room: Room }) {
             type="button"
             role="tab"
             aria-selected={tab === t.id}
-            className={`room-tab ${tab === t.id ? 'active' : ''}`}
+            className={`room-tab ${tab === t.id ? "active" : ""}`}
             onClick={() => openTab(t.id)}
           >
             {t.label}
@@ -100,32 +109,37 @@ export default function RoomWorkspace({ room }: { room: Room }) {
           <div className="side-tabs">
             <button
               type="button"
-              className={`room-tab ${sideTab === 'chat' ? 'active' : ''}`}
-              onClick={() => showSide('chat')}
+              className={`room-tab ${sideTab === "chat" ? "active" : ""}`}
+              onClick={() => showSide("chat")}
             >
               Chat
             </button>
             <button
               type="button"
-              className={`room-tab ${sideTab === 'members' ? 'active' : ''}`}
-              onClick={() => showSide('members')}
+              className={`room-tab ${sideTab === "members" ? "active" : ""}`}
+              onClick={() => showSide("members")}
             >
               Thành viên
             </button>
-            <button type="button" className="ghost close-sidebar" aria-label="Đóng" onClick={() => setSidebarOpen(false)}>
+            <button
+              type="button"
+              className="ghost close-sidebar"
+              aria-label="Đóng"
+              onClick={() => setSidebarOpen(false)}
+            >
               ✕
             </button>
           </div>
           <div className="side-content">
-            <div className="side-panel" hidden={sideTab !== 'chat'}>
+            <div className="side-panel" hidden={sideTab !== "chat"}>
               <Placeholder title="Chat" />
             </div>
-            <div className="side-panel" hidden={sideTab !== 'members'}>
+            <div className="side-panel" hidden={sideTab !== "members"}>
               <MembersPanel room={room} />
             </div>
           </div>
         </aside>
       </div>
     </div>
-  )
+  );
 }
