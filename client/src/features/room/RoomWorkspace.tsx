@@ -2,6 +2,7 @@ import { useState, type ReactNode } from 'react'
 import { Link } from 'react-router'
 import CopyButton from '../../components/CopyButton'
 import type { Room } from '../../services/rooms'
+import MindmapPanel from '../mindmap/MindmapPanel'
 import MembersPanel from './MembersPanel'
 import './room.css'
 
@@ -41,7 +42,7 @@ export default function RoomWorkspace({ room }: { room: Room }) {
 
   const panels: Record<MainTab, ReactNode> = {
     whiteboard: <Placeholder title="Bảng trắng" />,
-    mindmap: <Placeholder title="Sơ đồ tư duy" />,
+    mindmap: <MindmapPanel />,
     flashcard: <Placeholder title="Flashcard" />,
   }
 
