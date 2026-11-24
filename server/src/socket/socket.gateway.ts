@@ -37,6 +37,13 @@ interface MusicSyncPayload {
   updatedBy?: string;
 }
 
+interface CursorMovePayload {
+  roomId: number;
+  x: number;
+  y: number;
+  name?: string;
+}
+
 @WebSocketGateway({
   cors: {
     origin: true,
@@ -86,6 +93,11 @@ export class SocketGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
     if (joinedRooms) {
       for (const roomId of joinedRooms) {
+        const roomKey = this.getRoomKey(roomId);
+        this.server.to(roomKey).emit('cursor:leave', {
+          roomId,
+          socketId: client.id,
+        });
         await this.broadcastPeerCount(roomId);
       }
     }
@@ -141,6 +153,11 @@ export class SocketGateway implements OnGatewayConnection, OnGatewayDisconnect {
     const roomKey = this.getRoomKey(roomId);
     await client.leave(roomKey);
     this.clientRooms.get(client.id)?.delete(roomId);
+
+    client.to(roomKey).emit('cursor:leave', {
+      roomId,
+      socketId: client.id,
+    });
 
     await this.broadcastPeerCount(roomId);
   }
@@ -216,6 +233,46 @@ export class SocketGateway implements OnGatewayConnection, OnGatewayDisconnect {
     client.to(roomKey).emit('music:state', {
       roomId,
       state: nextState,
+    });
+  }
+
+  @SubscribeMessage('cursor:move')
+  handleCursorMove(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() payload: CursorMovePayload,
+  ): void {
+    const roomId = Number(payload?.roomId);
+    const x = Number(payload?.x);
+    const y = Number(payload?.y);
+    if (
+      !Number.isFinite(roomId) ||
+      !Number.isFinite(x) ||
+      !Number.isFinite(y)
+    ) {
+      return;
+    }
+
+    const roomKey = this.getRoomKey(roomId);
+    client.to(roomKey).emit('cursor:move', {
+      roomId,
+      socketId: client.id,
+      x,
+      y,
+      name: payload.name?.trim() || 'Thành viên',
+    });
+  }
+
+  @SubscribeMessage('cursor:leave')
+  handleCursorLeave(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() payload: RoomPayload,
+  ): void {
+    const roomId = Number(payload?.roomId);
+    if (!Number.isFinite(roomId)) return;
+
+    client.to(this.getRoomKey(roomId)).emit('cursor:leave', {
+      roomId,
+      socketId: client.id,
     });
   }
 }
