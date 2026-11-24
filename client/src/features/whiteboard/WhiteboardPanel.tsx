@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Canvas, FabricObject, IText, PencilBrush } from "fabric";
+import { getSocket } from "../../services/socket";
 import {
   createShapeObject,
   createStickyNoteObject,
@@ -14,6 +15,16 @@ import {
 import "./whiteboard.css";
 
 type ToolMode = "pen" | "highlighter" | "select";
+
+interface WhiteboardSyncPayload {
+  roomId: number;
+  canvasJson: Record<string, unknown>;
+}
+
+interface RoomPeersPayload {
+  roomId: number;
+  count: number;
+}
 
 const STROKE_COLORS = [
   "#1e293b",
@@ -42,8 +53,9 @@ export default function WhiteboardPanel({ roomId }: { roomId: number }) {
 
   const historyRef = useRef<string[]>([]);
   const historyIndexRef = useRef(-1);
-  const isRestoringRef = useRef(false);
+  const isSyncingRef = useRef(false);
   const spawnCountRef = useRef(0);
+  const broadcastTimerRef = useRef<number | null>(null);
 
   const [tool, setTool] = useState<ToolMode>("pen");
   const [strokeColor, setStrokeColor] = useState("#1e293b");
@@ -56,42 +68,80 @@ export default function WhiteboardPanel({ roomId }: { roomId: number }) {
   const [hasSelection, setHasSelection] = useState(false);
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
+  const [isConnected, setIsConnected] = useState(false);
+  const [peerCount, setPeerCount] = useState(1);
 
-  const saveSnapshot = useCallback((canvas: Canvas) => {
-    if (isRestoringRef.current) return;
-    const snapshot = JSON.stringify(canvas.toJSON());
-    const current = historyRef.current[historyIndexRef.current];
-    if (snapshot === current) return;
+  const emitBoardNow = useCallback(
+    (canvas: Canvas) => {
+      const socket = getSocket();
+      if (!socket.connected) return;
+      socket.emit("whiteboard:update", {
+        roomId,
+        canvasJson: canvas.toJSON(),
+      });
+    },
+    [roomId],
+  );
 
-    const next = historyRef.current.slice(0, historyIndexRef.current + 1);
-    next.push(snapshot);
-    if (next.length > MAX_HISTORY) next.shift();
+  const scheduleBroadcast = useCallback(
+    (canvas: Canvas) => {
+      if (broadcastTimerRef.current !== null) {
+        window.clearTimeout(broadcastTimerRef.current);
+      }
+      broadcastTimerRef.current = window.setTimeout(() => {
+        broadcastTimerRef.current = null;
+        emitBoardNow(canvas);
+      }, 80);
+    },
+    [emitBoardNow],
+  );
 
-    historyRef.current = next;
-    historyIndexRef.current = next.length - 1;
-    setCanUndo(historyIndexRef.current > 0);
-    setCanRedo(false);
-  }, []);
+  const saveSnapshot = useCallback(
+    (canvas: Canvas, shouldBroadcast = true) => {
+      if (isSyncingRef.current) return;
+      const snapshot = JSON.stringify(canvas.toJSON());
+      const current = historyRef.current[historyIndexRef.current];
+      if (snapshot === current) return;
 
-  const restoreHistory = useCallback(async (delta: number) => {
-    const canvas = fabricRef.current;
-    if (!canvas) return;
-    const targetIdx = historyIndexRef.current + delta;
-    if (targetIdx < 0 || targetIdx >= historyRef.current.length) return;
+      const next = historyRef.current.slice(0, historyIndexRef.current + 1);
+      next.push(snapshot);
+      if (next.length > MAX_HISTORY) next.shift();
 
-    isRestoringRef.current = true;
-    try {
-      await canvas.loadFromJSON(JSON.parse(historyRef.current[targetIdx]));
-      canvas.discardActiveObject();
-      canvas.requestRenderAll();
-      historyIndexRef.current = targetIdx;
-      setCanUndo(targetIdx > 0);
-      setCanRedo(targetIdx < historyRef.current.length - 1);
-      setHasSelection(false);
-    } finally {
-      isRestoringRef.current = false;
-    }
-  }, []);
+      historyRef.current = next;
+      historyIndexRef.current = next.length - 1;
+      setCanUndo(historyIndexRef.current > 0);
+      setCanRedo(false);
+
+      if (shouldBroadcast) {
+        scheduleBroadcast(canvas);
+      }
+    },
+    [scheduleBroadcast],
+  );
+
+  const restoreHistory = useCallback(
+    async (delta: number) => {
+      const canvas = fabricRef.current;
+      if (!canvas) return;
+      const targetIdx = historyIndexRef.current + delta;
+      if (targetIdx < 0 || targetIdx >= historyRef.current.length) return;
+
+      isSyncingRef.current = true;
+      try {
+        await canvas.loadFromJSON(JSON.parse(historyRef.current[targetIdx]));
+        canvas.discardActiveObject();
+        canvas.requestRenderAll();
+        historyIndexRef.current = targetIdx;
+        setCanUndo(targetIdx > 0);
+        setCanRedo(targetIdx < historyRef.current.length - 1);
+        setHasSelection(false);
+        emitBoardNow(canvas);
+      } finally {
+        isSyncingRef.current = false;
+      }
+    },
+    [emitBoardNow],
+  );
 
   const duplicateSelected = useCallback(async () => {
     const canvas = fabricRef.current;
@@ -110,7 +160,6 @@ export default function WhiteboardPanel({ roomId }: { roomId: number }) {
     saveSnapshot(canvas);
   }, [saveSnapshot]);
 
-  // Dong menu Shapes khi click ra ngoai
   useEffect(() => {
     if (!shapesOpen) return;
     function handleOutside(e: MouseEvent) {
@@ -122,7 +171,6 @@ export default function WhiteboardPanel({ roomId }: { roomId: number }) {
     return () => document.removeEventListener("mousedown", handleOutside);
   }, [shapesOpen]);
 
-  // Khoi tao Fabric Canvas
   useEffect(() => {
     const stage = stageRef.current;
     const canvasEl = canvasElRef.current;
@@ -141,7 +189,6 @@ export default function WhiteboardPanel({ roomId }: { roomId: number }) {
     canvas.freeDrawingBrush = brush;
     fabricRef.current = canvas;
 
-    // Luu trang thai trang ban dau vao lich su
     historyRef.current = [JSON.stringify(canvas.toJSON())];
     historyIndexRef.current = 0;
 
@@ -177,7 +224,7 @@ export default function WhiteboardPanel({ roomId }: { roomId: number }) {
       setDashStyle(detectDashStyle(obj.strokeDashArray));
     }
 
-    const onChanged = () => saveSnapshot(canvas);
+    const onChanged = () => saveSnapshot(canvas, true);
 
     canvas.on("selection:created", syncFromSelection);
     canvas.on("selection:updated", syncFromSelection);
@@ -240,12 +287,98 @@ export default function WhiteboardPanel({ roomId }: { roomId: number }) {
     return () => {
       window.removeEventListener("keydown", handleKeyDown);
       observer.disconnect();
+      if (broadcastTimerRef.current !== null) {
+        window.clearTimeout(broadcastTimerRef.current);
+        broadcastTimerRef.current = null;
+      }
       fabricRef.current = null;
       void canvas.dispose();
     };
   }, [duplicateSelected, restoreHistory, saveSnapshot]);
 
-  // Dong bo che do but ve / but da quang
+  useEffect(() => {
+    const socket = getSocket();
+
+    const applyRemoteBoard = async (payload: WhiteboardSyncPayload) => {
+      if (payload.roomId !== roomId) return;
+      const canvas = fabricRef.current;
+      if (!canvas) return;
+
+      isSyncingRef.current = true;
+      try {
+        await canvas.loadFromJSON(payload.canvasJson);
+        canvas.discardActiveObject();
+        canvas.requestRenderAll();
+        setHasSelection(false);
+
+        const snapshot = JSON.stringify(canvas.toJSON());
+        historyRef.current = [snapshot];
+        historyIndexRef.current = 0;
+        setCanUndo(false);
+        setCanRedo(false);
+      } finally {
+        isSyncingRef.current = false;
+      }
+    };
+
+    const handleRemoteClear = (payload: { roomId: number }) => {
+      if (payload.roomId !== roomId) return;
+      const canvas = fabricRef.current;
+      if (!canvas) return;
+
+      isSyncingRef.current = true;
+      try {
+        canvas.clear();
+        canvas.requestRenderAll();
+        setHasSelection(false);
+
+        const snapshot = JSON.stringify(canvas.toJSON());
+        historyRef.current = [snapshot];
+        historyIndexRef.current = 0;
+        setCanUndo(false);
+        setCanRedo(false);
+      } finally {
+        isSyncingRef.current = false;
+      }
+    };
+
+    const handlePeers = (payload: RoomPeersPayload) => {
+      if (payload.roomId === roomId) {
+        setPeerCount(payload.count);
+      }
+    };
+
+    const handleConnect = () => {
+      setIsConnected(true);
+      socket.emit("room:join", { roomId });
+    };
+
+    const handleDisconnect = () => {
+      setIsConnected(false);
+    };
+
+    socket.on("connect", handleConnect);
+    socket.on("disconnect", handleDisconnect);
+    socket.on("room:peers", handlePeers);
+    socket.on("whiteboard:state", applyRemoteBoard);
+    socket.on("whiteboard:update", applyRemoteBoard);
+    socket.on("whiteboard:clear", handleRemoteClear);
+
+    if (socket.connected) {
+      handleConnect();
+    }
+
+    return () => {
+      socket.emit("room:leave", { roomId });
+      socket.off("connect", handleConnect);
+      socket.off("disconnect", handleDisconnect);
+      socket.off("room:peers", handlePeers);
+      socket.off("whiteboard:state", applyRemoteBoard);
+      socket.off("whiteboard:update", applyRemoteBoard);
+      socket.off("whiteboard:clear", handleRemoteClear);
+    };
+  }, [roomId]);
+
   useEffect(() => {
     const canvas = fabricRef.current;
     if (!canvas) return;
@@ -262,7 +395,6 @@ export default function WhiteboardPanel({ roomId }: { roomId: number }) {
     }
   }, [tool, strokeColor, strokeWidth]);
 
-  // Cap nhat thuoc tinh truc tiep len cac doi tuong dang chon
   function updateSelected(updater: (obj: FabricObject) => void) {
     const canvas = fabricRef.current;
     if (!canvas) return;
@@ -293,7 +425,6 @@ export default function WhiteboardPanel({ roomId }: { roomId: number }) {
       } else if (obj.type !== "line" && obj.type !== "path") {
         obj.set("fill", nextFill);
       } else if (obj.type === "path" && obj.fill !== "") {
-        // Callout la path khep kin nen doi mau nen duoc, con mui ten (fill === '') thi giu nguyen
         obj.set("fill", nextFill);
       }
     });
@@ -383,9 +514,20 @@ export default function WhiteboardPanel({ roomId }: { roomId: number }) {
   function clearBoard() {
     const canvas = fabricRef.current;
     if (!canvas) return;
-    canvas.clear();
-    canvas.requestRenderAll();
-    saveSnapshot(canvas);
+
+    isSyncingRef.current = true;
+    try {
+      canvas.clear();
+      canvas.requestRenderAll();
+    } finally {
+      isSyncingRef.current = false;
+    }
+
+    saveSnapshot(canvas, false);
+    const socket = getSocket();
+    if (socket.connected) {
+      socket.emit("whiteboard:clear", { roomId });
+    }
   }
 
   function exportPng() {
@@ -410,7 +552,6 @@ export default function WhiteboardPanel({ roomId }: { roomId: number }) {
   return (
     <div className="whiteboard">
       <div className="wb-toolbar">
-        {/* Cong cu ve & chon */}
         <div className="wb-group">
           <button
             type="button"
@@ -436,7 +577,6 @@ export default function WhiteboardPanel({ roomId }: { roomId: number }) {
           </button>
         </div>
 
-        {/* Menu hinh dang kieu Word + Chu + Ghi chu */}
         <div className="wb-group">
           <div className="wb-dropdown-wrap" ref={menuRef}>
             <button
@@ -496,7 +636,6 @@ export default function WhiteboardPanel({ roomId }: { roomId: number }) {
           </button>
         </div>
 
-        {/* Mau vien / Mau chu */}
         <div className="wb-group">
           <div className="wb-color-block">
             <span className="wb-label">Viền:</span>
@@ -520,7 +659,6 @@ export default function WhiteboardPanel({ roomId }: { roomId: number }) {
           </div>
         </div>
 
-        {/* Mau nen (Fill) */}
         <div className="wb-group">
           <div className="wb-color-block">
             <span className="wb-label">Nền:</span>
@@ -547,7 +685,6 @@ export default function WhiteboardPanel({ roomId }: { roomId: number }) {
           </div>
         </div>
 
-        {/* Do day & Kieu net */}
         <div className="wb-group">
           <label className="wb-size">
             {strokeWidth}px
@@ -571,7 +708,6 @@ export default function WhiteboardPanel({ roomId }: { roomId: number }) {
           </select>
         </div>
 
-        {/* Thao tac nhanh & Lich su */}
         <div className="wb-group">
           <button
             type="button"
@@ -640,6 +776,10 @@ export default function WhiteboardPanel({ roomId }: { roomId: number }) {
           <button type="button" className="wb-btn" onClick={exportPng}>
             PNG
           </button>
+          <span className="wb-status" title="Trạng thái đồng bộ realtime">
+            <span className={`wb-dot ${isConnected ? "online" : ""}`} />
+            {isConnected ? `Realtime · ${peerCount}` : "Đang kết nối…"}
+          </span>
         </div>
       </div>
 
