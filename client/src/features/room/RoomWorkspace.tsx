@@ -4,11 +4,12 @@ import CopyButton from "../../components/CopyButton";
 import type { Room } from "../../services/rooms";
 import MindmapPanel from "../mindmap/MindmapPanel";
 import WhiteboardPanel from "../whiteboard/WhiteboardPanel";
+import MusicPanel from "../music/MusicPanel";
 import MembersPanel from "./MembersPanel";
 import "./room.css";
 
 type MainTab = "whiteboard" | "mindmap" | "flashcard";
-type SideTab = "chat" | "members";
+type SideTab = "chat" | "members" | "music";
 
 const MAIN_TABS: { id: MainTab; label: string }[] = [
   { id: "whiteboard", label: "Bảng trắng" },
@@ -70,9 +71,22 @@ export default function RoomWorkspace({ room }: { room: Room }) {
         <div className="room-header-right">
           <button
             type="button"
-            className={sidebarOpen ? "primary" : ""}
+            className={sidebarOpen && sideTab === "music" ? "primary" : ""}
             onClick={() =>
-              sidebarOpen ? setSidebarOpen(false) : showSide(sideTab)
+              sidebarOpen && sideTab === "music"
+                ? setSidebarOpen(false)
+                : showSide("music")
+            }
+          >
+            Nhạc
+          </button>
+          <button
+            type="button"
+            className={sidebarOpen && sideTab !== "music" ? "primary" : ""}
+            onClick={() =>
+              sidebarOpen && sideTab !== "music"
+                ? setSidebarOpen(false)
+                : showSide("chat")
             }
             aria-pressed={sidebarOpen}
           >
@@ -116,6 +130,13 @@ export default function RoomWorkspace({ room }: { room: Room }) {
             </button>
             <button
               type="button"
+              className={`room-tab ${sideTab === "music" ? "active" : ""}`}
+              onClick={() => showSide("music")}
+            >
+              Nhạc
+            </button>
+            <button
+              type="button"
               className={`room-tab ${sideTab === "members" ? "active" : ""}`}
               onClick={() => showSide("members")}
             >
@@ -136,6 +157,9 @@ export default function RoomWorkspace({ room }: { room: Room }) {
             </div>
             <div className="side-panel" hidden={sideTab !== "members"}>
               <MembersPanel room={room} />
+            </div>
+            <div className="side-panel" hidden={sideTab !== "music"}>
+              <MusicPanel roomId={room.id} />
             </div>
           </div>
         </aside>
