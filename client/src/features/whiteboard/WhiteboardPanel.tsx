@@ -389,11 +389,16 @@ export default function WhiteboardPanel({ roomId }: { roomId: number }) {
     if (tool === "highlighter") {
       canvas.freeDrawingBrush.color = hexToRgba(strokeColor, 0.35);
       canvas.freeDrawingBrush.width = Math.max(16, strokeWidth * 3);
+      canvas.freeDrawingBrush.strokeDashArray = null;
     } else {
       canvas.freeDrawingBrush.color = strokeColor;
       canvas.freeDrawingBrush.width = strokeWidth;
+      canvas.freeDrawingBrush.strokeDashArray = getDashArray(
+        dashStyle,
+        strokeWidth,
+      );
     }
-  }, [tool, strokeColor, strokeWidth]);
+  }, [tool, strokeColor, strokeWidth, dashStyle]);
 
   function updateSelected(updater: (obj: FabricObject) => void) {
     const canvas = fabricRef.current;
@@ -434,17 +439,22 @@ export default function WhiteboardPanel({ roomId }: { roomId: number }) {
     setStrokeWidth(nextWidth);
     updateSelected((obj) => {
       if (!(obj instanceof IText)) {
-        obj.set("strokeWidth", nextWidth);
+        const currentDash = detectDashStyle(obj.strokeDashArray);
+        obj.set({
+          strokeWidth: nextWidth,
+          strokeDashArray: getDashArray(currentDash, nextWidth),
+        });
       }
     });
   }
 
   function handleDashChange(nextDash: DashStyle) {
     setDashStyle(nextDash);
-    const dashArray = getDashArray(nextDash);
     updateSelected((obj) => {
       if (!(obj instanceof IText)) {
-        obj.set("strokeDashArray", dashArray);
+        const w =
+          typeof obj.strokeWidth === "number" ? obj.strokeWidth : strokeWidth;
+        obj.set("strokeDashArray", getDashArray(nextDash, w));
       }
     });
   }
