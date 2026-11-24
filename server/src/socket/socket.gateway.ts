@@ -19,6 +19,24 @@ interface WhiteboardUpdatePayload {
   canvasJson: Record<string, unknown>;
 }
 
+export interface MusicState {
+  videoId: string;
+  title: string;
+  isPlaying: boolean;
+  currentTime: number;
+  updatedAt: number;
+  updatedBy?: string;
+}
+
+interface MusicSyncPayload {
+  roomId: number;
+  videoId: string;
+  title?: string;
+  isPlaying: boolean;
+  currentTime: number;
+  updatedBy?: string;
+}
+
 @WebSocketGateway({
   cors: {
     origin: true,
@@ -32,10 +50,21 @@ export class SocketGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   private readonly logger = new Logger(SocketGateway.name);
   private readonly boardStates = new Map<string, Record<string, unknown>>();
+  private readonly musicStates = new Map<string, MusicState>();
   private readonly clientRooms = new Map<string, Set<number>>();
 
   private getRoomKey(roomId: number): string {
     return `room:${roomId}`;
+  }
+
+  private getLiveMusicState(state: MusicState): MusicState {
+    if (!state.isPlaying) return state;
+    const elapsedSeconds = Math.max(0, (Date.now() - state.updatedAt) / 1000);
+    return {
+      ...state,
+      currentTime: state.currentTime + elapsedSeconds,
+      updatedAt: Date.now(),
+    };
   }
 
   private async broadcastPeerCount(roomId: number): Promise<void> {
@@ -82,11 +111,19 @@ export class SocketGateway implements OnGatewayConnection, OnGatewayDisconnect {
     }
     rooms.add(roomId);
 
-    const existingState = this.boardStates.get(roomKey);
-    if (existingState) {
+    const existingBoard = this.boardStates.get(roomKey);
+    if (existingBoard) {
       client.emit('whiteboard:state', {
         roomId,
-        canvasJson: existingState,
+        canvasJson: existingBoard,
+      });
+    }
+
+    const existingMusic = this.musicStates.get(roomKey);
+    if (existingMusic) {
+      client.emit('music:state', {
+        roomId,
+        state: this.getLiveMusicState(existingMusic),
       });
     }
 
@@ -137,5 +174,48 @@ export class SocketGateway implements OnGatewayConnection, OnGatewayDisconnect {
     this.boardStates.delete(roomKey);
 
     client.to(roomKey).emit('whiteboard:clear', { roomId });
+  }
+
+  @SubscribeMessage('music:get-state')
+  handleGetMusicState(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() payload: RoomPayload,
+  ): void {
+    const roomId = Number(payload?.roomId);
+    if (!Number.isFinite(roomId)) return;
+
+    const existingMusic = this.musicStates.get(this.getRoomKey(roomId));
+    if (!existingMusic) return;
+
+    client.emit('music:state', {
+      roomId,
+      state: this.getLiveMusicState(existingMusic),
+    });
+  }
+
+  @SubscribeMessage('music:sync')
+  handleMusicSync(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() payload: MusicSyncPayload,
+  ): void {
+    const roomId = Number(payload?.roomId);
+    const videoId = payload?.videoId?.trim();
+    if (!Number.isFinite(roomId) || !videoId) return;
+
+    const roomKey = this.getRoomKey(roomId);
+    const nextState: MusicState = {
+      videoId,
+      title: payload.title?.trim() || 'Nhạc học tập',
+      isPlaying: Boolean(payload.isPlaying),
+      currentTime: Math.max(0, Number(payload.currentTime) || 0),
+      updatedAt: Date.now(),
+      updatedBy: payload.updatedBy?.trim(),
+    };
+
+    this.musicStates.set(roomKey, nextState);
+    client.to(roomKey).emit('music:state', {
+      roomId,
+      state: nextState,
+    });
   }
 }
