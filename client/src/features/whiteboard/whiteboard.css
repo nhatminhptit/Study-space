@@ -245,3 +245,43 @@
 .wb-dot.online {
   background: #16a34a;
 }
+
+/* Lop phu Live Cursors */
+.wb-cursors-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 15;
+  overflow: hidden;
+}
+
+.wb-remote-cursor {
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 2px;
+  transition: transform 60ms linear;
+  will-change: transform;
+}
+
+.wb-cursor-pointer {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  filter: drop-shadow(0 1px 2px rgb(15 23 42 / 0.25));
+}
+
+.wb-cursor-label {
+  margin-top: 12px;
+  margin-left: -4px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: nowrap;
+  box-shadow: 0 2px 6px rgb(15 23 42 / 0.18);
+}

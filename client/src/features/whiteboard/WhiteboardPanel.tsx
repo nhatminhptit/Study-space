@@ -1,6 +1,13 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type PointerEvent,
+} from "react";
 import { Canvas, FabricObject, IText, PencilBrush } from "fabric";
 import { getSocket } from "../../services/socket";
+import { useAuth } from "../auth/AuthContext";
 import {
   createShapeObject,
   createStickyNoteObject,
@@ -26,6 +33,27 @@ interface RoomPeersPayload {
   count: number;
 }
 
+interface RemoteCursor {
+  socketId: string;
+  x: number;
+  y: number;
+  name: string;
+  color: string;
+}
+
+interface CursorMoveEvent {
+  roomId: number;
+  socketId: string;
+  x: number;
+  y: number;
+  name: string;
+}
+
+interface CursorLeaveEvent {
+  roomId: number;
+  socketId: string;
+}
+
 const STROKE_COLORS = [
   "#1e293b",
   "#ef4444",
@@ -43,9 +71,29 @@ const FILL_COLORS = [
   "#fecaca",
   "#e9d5ff",
 ];
+const CURSOR_COLORS = [
+  "#ef4444",
+  "#2563eb",
+  "#16a34a",
+  "#d97706",
+  "#9333ea",
+  "#0891b2",
+  "#e11d48",
+];
 const MAX_HISTORY = 30;
 
+function colorForSocket(socketId: string): string {
+  let hash = 0;
+  for (let i = 0; i < socketId.length; i += 1) {
+    hash = (hash * 31 + socketId.charCodeAt(i)) >>> 0;
+  }
+  return CURSOR_COLORS[hash % CURSOR_COLORS.length];
+}
+
 export default function WhiteboardPanel({ roomId }: { roomId: number }) {
+  const { user } = useAuth();
+  const userName = user?.name || "Thành viên";
+
   const stageRef = useRef<HTMLDivElement | null>(null);
   const canvasElRef = useRef<HTMLCanvasElement | null>(null);
   const fabricRef = useRef<Canvas | null>(null);
@@ -56,6 +104,7 @@ export default function WhiteboardPanel({ roomId }: { roomId: number }) {
   const isSyncingRef = useRef(false);
   const spawnCountRef = useRef(0);
   const broadcastTimerRef = useRef<number | null>(null);
+  const lastCursorEmitRef = useRef(0);
 
   const [tool, setTool] = useState<ToolMode>("pen");
   const [strokeColor, setStrokeColor] = useState("#1e293b");
@@ -70,6 +119,9 @@ export default function WhiteboardPanel({ roomId }: { roomId: number }) {
   const [canRedo, setCanRedo] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [peerCount, setPeerCount] = useState(1);
+  const [remoteCursors, setRemoteCursors] = useState<
+    Record<string, RemoteCursor>
+  >({});
 
   const emitBoardNow = useCallback(
     (canvas: Canvas) => {
@@ -348,6 +400,31 @@ export default function WhiteboardPanel({ roomId }: { roomId: number }) {
       }
     };
 
+    const handleCursorMove = (payload: CursorMoveEvent) => {
+      if (payload.roomId !== roomId || !payload.socketId) return;
+      setRemoteCursors((prev) => ({
+        ...prev,
+        [payload.socketId]: {
+          socketId: payload.socketId,
+          x: payload.x,
+          y: payload.y,
+          name: payload.name || "Thành viên",
+          color:
+            prev[payload.socketId]?.color || colorForSocket(payload.socketId),
+        },
+      }));
+    };
+
+    const handleCursorLeave = (payload: CursorLeaveEvent) => {
+      if (payload.roomId !== roomId || !payload.socketId) return;
+      setRemoteCursors((prev) => {
+        if (!(payload.socketId in prev)) return prev;
+        const next = { ...prev };
+        delete next[payload.socketId];
+        return next;
+      });
+    };
+
     const handleConnect = () => {
       setIsConnected(true);
       socket.emit("room:join", { roomId });
@@ -355,6 +432,7 @@ export default function WhiteboardPanel({ roomId }: { roomId: number }) {
 
     const handleDisconnect = () => {
       setIsConnected(false);
+      setRemoteCursors({});
     };
 
     socket.on("connect", handleConnect);
@@ -363,12 +441,15 @@ export default function WhiteboardPanel({ roomId }: { roomId: number }) {
     socket.on("whiteboard:state", applyRemoteBoard);
     socket.on("whiteboard:update", applyRemoteBoard);
     socket.on("whiteboard:clear", handleRemoteClear);
+    socket.on("cursor:move", handleCursorMove);
+    socket.on("cursor:leave", handleCursorLeave);
 
     if (socket.connected) {
       handleConnect();
     }
 
     return () => {
+      socket.emit("cursor:leave", { roomId });
       socket.emit("room:leave", { roomId });
       socket.off("connect", handleConnect);
       socket.off("disconnect", handleDisconnect);
@@ -376,6 +457,8 @@ export default function WhiteboardPanel({ roomId }: { roomId: number }) {
       socket.off("whiteboard:state", applyRemoteBoard);
       socket.off("whiteboard:update", applyRemoteBoard);
       socket.off("whiteboard:clear", handleRemoteClear);
+      socket.off("cursor:move", handleCursorMove);
+      socket.off("cursor:leave", handleCursorLeave);
     };
   }, [roomId]);
 
@@ -554,6 +637,34 @@ export default function WhiteboardPanel({ roomId }: { roomId: number }) {
     link.href = url;
     link.download = `whiteboard-room-${roomId}.png`;
     link.click();
+  }
+
+  function handlePointerMove(e: PointerEvent<HTMLDivElement>) {
+    const now = Date.now();
+    if (now - lastCursorEmitRef.current < 40) return;
+    lastCursorEmitRef.current = now;
+
+    const stage = stageRef.current;
+    const socket = getSocket();
+    if (!stage || !socket.connected) return;
+
+    const rect = stage.getBoundingClientRect();
+    const x = Math.round(e.clientX - rect.left);
+    const y = Math.round(e.clientY - rect.top);
+
+    socket.emit("cursor:move", {
+      roomId,
+      x,
+      y,
+      name: userName,
+    });
+  }
+
+  function handlePointerLeave() {
+    const socket = getSocket();
+    if (socket.connected) {
+      socket.emit("cursor:leave", { roomId });
+    }
   }
 
   const basicShapes = SHAPE_CATALOG.filter((s) => s.group === "basic");
@@ -793,8 +904,45 @@ export default function WhiteboardPanel({ roomId }: { roomId: number }) {
         </div>
       </div>
 
-      <div ref={stageRef} className={`wb-stage ${showGrid ? "with-grid" : ""}`}>
+      <div
+        ref={stageRef}
+        className={`wb-stage ${showGrid ? "with-grid" : ""}`}
+        onPointerMove={handlePointerMove}
+        onPointerLeave={handlePointerLeave}
+      >
         <canvas ref={canvasElRef} />
+
+        <div className="wb-cursors-layer" aria-hidden="true">
+          {Object.values(remoteCursors).map((cursor) => (
+            <div
+              key={cursor.socketId}
+              className="wb-remote-cursor"
+              style={{
+                transform: `translate3d(${cursor.x}px, ${cursor.y}px, 0)`,
+              }}
+            >
+              <svg
+                className="wb-cursor-pointer"
+                viewBox="0 0 24 24"
+                fill="none"
+              >
+                <path
+                  d="M4 3L11 20L13.8 13.8L20 11L4 3Z"
+                  fill={cursor.color}
+                  stroke="#ffffff"
+                  strokeWidth="1.8"
+                  strokeLinejoin="round"
+                />
+              </svg>
+              <span
+                className="wb-cursor-label"
+                style={{ background: cursor.color }}
+              >
+                {cursor.name}
+              </span>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
