@@ -114,15 +114,23 @@ export const SHAPE_CATALOG: ShapeCatalogItem[] = [
   },
 ];
 
-export function getDashArray(style: DashStyle): number[] | null {
-  if (style === "dashed") return [10, 6];
-  if (style === "dotted") return [2, 6];
+export function getDashArray(
+  style: DashStyle,
+  strokeWidth = 3,
+): number[] | null {
+  const w = Math.max(2, strokeWidth);
+  if (style === "dashed") {
+    return [Math.round(w * 2.8), Math.round(w * 1.8)];
+  }
+  if (style === "dotted") {
+    return [Math.max(1, Math.round(w * 0.25)), Math.round(w * 2.2)];
+  }
   return null;
 }
 
 export function detectDashStyle(dash: number[] | null | undefined): DashStyle {
-  if (!Array.isArray(dash) || dash.length === 0) return "solid";
-  return dash[0] <= 4 ? "dotted" : "dashed";
+  if (!Array.isArray(dash) || dash.length < 2) return "solid";
+  return dash[0] < dash[1] ? "dotted" : "dashed";
 }
 
 export function hexToRgba(hex: string, alpha: number): string {
@@ -163,13 +171,14 @@ export function createShapeObject(
 ): FabricObject {
   const left = 110 + offset;
   const top = 90 + offset;
+  const w = Math.max(2, style.strokeWidth);
   const common = {
     left,
     top,
     fill: style.fill === "transparent" ? "transparent" : style.fill,
     stroke: style.stroke,
-    strokeWidth: Math.max(2, style.strokeWidth),
-    strokeDashArray: getDashArray(style.dash),
+    strokeWidth: w,
+    strokeDashArray: getDashArray(style.dash, w),
     strokeUniform: true,
     strokeLineCap: "round" as const,
     strokeLineJoin: "round" as const,
@@ -208,8 +217,8 @@ export function createShapeObject(
     case "line":
       return new Line([left, top + 40, left + 160, top + 40], {
         stroke: style.stroke,
-        strokeWidth: Math.max(2, style.strokeWidth),
-        strokeDashArray: getDashArray(style.dash),
+        strokeWidth: w,
+        strokeDashArray: getDashArray(style.dash, w),
         strokeUniform: true,
         strokeLineCap: "round",
       });
