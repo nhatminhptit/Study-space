@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import MindmapView from './MindmapView'
+import PdfAnalyzer from './PdfAnalyzer'
 import { sampleMindmapJson } from './sampleData'
 
 /*
  * Tab "So do tu duy" trong phong hoc: dan JSON vao o ben trai roi bam "Ve" de render.
- * Luong upload PDF -> AI sinh JSON (T04DEF0) se goi thang <MindmapView json={...} />.
+ * Hoac tai PDF len: backend doc PDF + AI sinh JSON (T04DEF0) roi ve ngay.
  */
 export default function MindmapPanel() {
   const [draft, setDraft] = useState(sampleMindmapJson)
@@ -14,6 +15,13 @@ export default function MindmapPanel() {
   return (
     <div className="mm-panel">
       <aside className="mm-editor" hidden={!editorOpen}>
+        <PdfAnalyzer
+          onResult={(result) => {
+            const next = JSON.stringify(result.mindmap, null, 2)
+            setDraft(next)
+            setJson(next)
+          }}
+        />
         <h3>Dữ liệu JSON</h3>
         <p>
           Dạng <code>{'{ label, note?, children? }'}</code> hoặc cả response <code>{'{ title, summary, mindmap }'}</code>.
@@ -43,7 +51,7 @@ export default function MindmapPanel() {
       <div className="mm-main">
         <div className="mm-main-bar">
           <button type="button" className="ghost" onClick={() => setEditorOpen((v) => !v)} aria-pressed={editorOpen}>
-            {editorOpen ? 'Ẩn JSON' : 'Sửa JSON'}
+            {editorOpen ? 'Ẩn bảng điều khiển' : 'Tạo từ PDF / sửa JSON'}
           </button>
         </div>
         <MindmapView json={json} />
