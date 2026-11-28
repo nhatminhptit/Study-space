@@ -6,6 +6,7 @@ import { RoomModule } from './room/room.module.js';
 import { DocumentModule } from './document/document.module.js';
 import { SocketModule } from './socket/socket.module.js';
 import { AiModule } from './ai/ai.module.js';
+import { AnalysisModule } from './analysis/analysis.module.js';
 import { ChatModule } from './chat/chat.module.js';
 
 @Module({
@@ -15,6 +16,7 @@ import { ChatModule } from './chat/chat.module.js';
     DocumentModule,
     SocketModule,
     AiModule,
+    AnalysisModule,
     ChatModule,
   ],
   controllers: [AppController],

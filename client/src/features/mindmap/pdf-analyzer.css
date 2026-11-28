@@ -1,0 +1,101 @@
+/* khung upload PDF -> AI mindmap (T04DEF0) */
+.pdf-ai {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+.pdf-drop {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 14px 10px;
+  border: 2px dashed var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  text-align: center;
+  transition: border-color 0.15s, background 0.15s;
+}
+.pdf-drop.dragging {
+  border-color: var(--primary);
+  background: var(--primary-soft);
+}
+.pdf-drop-hint {
+  font-size: 12px;
+  color: var(--muted);
+}
+.pdf-progress,
+.pdf-result {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.pdf-file {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+.pdf-steps {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.pdf-steps li::before {
+  content: '○';
+  display: inline-block;
+  width: 18px;
+}
+.pdf-steps li.done {
+  color: var(--success);
+}
+.pdf-steps li.done::before {
+  content: '✓';
+}
+.pdf-steps li.active {
+  color: var(--primary);
+  font-weight: 600;
+}
+.pdf-steps li.active::before {
+  content: '●';
+  animation: pdf-pulse 1s ease-in-out infinite;
+}
+@keyframes pdf-pulse {
+  50% {
+    opacity: 0.3;
+  }
+}
+.pdf-error {
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--danger-soft);
+  color: var(--danger);
+  font-size: 13px;
+}
+.pdf-result h4 {
+  margin: 0;
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pdf-ai .pdf-meta,
+.pdf-ai .pdf-warn {
+  font-size: 12px;
+}
+.pdf-ai .pdf-warn {
+  color: #b45309;
+}
+.pdf-ai .pdf-summary {
+  max-height: 120px;
+  overflow: auto;
+  color: var(--text);
+  line-height: 1.45;
+}
