@@ -2,6 +2,7 @@ import { useCallback, useState, type ReactNode } from "react";
 import { Link } from "react-router";
 import CopyButton from "../../components/CopyButton";
 import type { Room } from "../../services/rooms";
+import AiTutorPanel from "../ai-tutor/AiTutorPanel";
 import MindmapPanel from "../mindmap/MindmapPanel";
 import WhiteboardPanel from "../whiteboard/WhiteboardPanel";
 import MusicPanel from "../music/MusicPanel";
@@ -10,26 +11,22 @@ import { useRoomPresence } from "../chat/useRoomPresence";
 import MembersPanel from "./MembersPanel";
 import "./room.css";
 
-type MainTab = "whiteboard" | "mindmap" | "flashcard";
+type MainTab = "whiteboard" | "mindmap" | "flashcard" | "ai-tutor";
 type SideTab = "chat" | "members" | "music";
 
 const MAIN_TABS: { id: MainTab; label: string }[] = [
   { id: "whiteboard", label: "Bảng trắng" },
   { id: "mindmap", label: "Sơ đồ tư duy" },
   { id: "flashcard", label: "Flashcard" },
+  { id: "ai-tutor", label: "AI Tutor" },
 ];
 
 function Placeholder({ title }: { title: string }) {
   return <div className="placeholder">{title} – đang phát triển</div>;
 }
 
-/*
- * Khung khong gian hoc cua 1 phong: header phong, vung lam viec (tab) va sidebar.
- * Cac task sau gan component that vao: bang trang, mindmap, flashcard, chat.
- */
 export default function RoomWorkspace({ room }: { room: Room }) {
   const [tab, setTab] = useState<MainTab>("whiteboard");
-  // giu cac tab da mo de khong mat trang thai khi chuyen tab
   const [visited, setVisited] = useState<Set<MainTab>>(
     () => new Set(["whiteboard"]),
   );
@@ -39,7 +36,6 @@ export default function RoomWorkspace({ room }: { room: Room }) {
   const [unread, setUnread] = useState(0);
   const chatVisible = sidebarOpen && sideTab === "chat";
 
-  // dem tin moi den khi khung chat dang an
   const onIncoming = useCallback(() => {
     if (!chatVisible) setUnread((n) => n + 1);
   }, [chatVisible]);
@@ -59,6 +55,7 @@ export default function RoomWorkspace({ room }: { room: Room }) {
     whiteboard: <WhiteboardPanel roomId={room.id} />,
     mindmap: <MindmapPanel />,
     flashcard: <Placeholder title="Flashcard" />,
+    "ai-tutor": <AiTutorPanel />,
   };
 
   return (
