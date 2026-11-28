@@ -1,10 +1,12 @@
-import { useState, type ReactNode } from "react";
+import { useCallback, useState, type ReactNode } from "react";
 import { Link } from "react-router";
 import CopyButton from "../../components/CopyButton";
 import type { Room } from "../../services/rooms";
 import MindmapPanel from "../mindmap/MindmapPanel";
 import WhiteboardPanel from "../whiteboard/WhiteboardPanel";
 import MusicPanel from "../music/MusicPanel";
+import ChatPanel from "../chat/ChatPanel";
+import { useRoomPresence } from "../chat/useRoomPresence";
 import MembersPanel from "./MembersPanel";
 import "./room.css";
 
@@ -33,6 +35,14 @@ export default function RoomWorkspace({ room }: { room: Room }) {
   );
   const [sideTab, setSideTab] = useState<SideTab>("chat");
   const [sidebarOpen, setSidebarOpen] = useState(() => window.innerWidth > 900);
+  const presence = useRoomPresence(room.id);
+  const [unread, setUnread] = useState(0);
+  const chatVisible = sidebarOpen && sideTab === "chat";
+
+  // dem tin moi den khi khung chat dang an
+  const onIncoming = useCallback(() => {
+    if (!chatVisible) setUnread((n) => n + 1);
+  }, [chatVisible]);
 
   function openTab(next: MainTab) {
     setTab(next);
@@ -42,6 +52,7 @@ export default function RoomWorkspace({ room }: { room: Room }) {
   function showSide(next: SideTab) {
     setSideTab(next);
     setSidebarOpen(true);
+    if (next === "chat") setUnread(0);
   }
 
   const panels: Record<MainTab, ReactNode> = {
@@ -91,6 +102,7 @@ export default function RoomWorkspace({ room }: { room: Room }) {
             aria-pressed={sidebarOpen}
           >
             Chat
+            {unread > 0 && <span className="unread-badge">{unread}</span>}
           </button>
         </div>
       </header>
@@ -127,6 +139,7 @@ export default function RoomWorkspace({ room }: { room: Room }) {
               onClick={() => showSide("chat")}
             >
               Chat
+              {unread > 0 && <span className="unread-badge">{unread}</span>}
             </button>
             <button
               type="button"
@@ -141,6 +154,9 @@ export default function RoomWorkspace({ room }: { room: Room }) {
               onClick={() => showSide("members")}
             >
               Thành viên
+              {presence.users.length > 0 && (
+                <span className="online-badge">{presence.users.length}</span>
+              )}
             </button>
             <button
               type="button"
@@ -153,10 +169,16 @@ export default function RoomWorkspace({ room }: { room: Room }) {
           </div>
           <div className="side-content">
             <div className="side-panel" hidden={sideTab !== "chat"}>
-              <Placeholder title="Chat" />
+              <ChatPanel
+                roomId={room.id}
+                online={presence.users}
+                connected={presence.connected}
+                active={chatVisible}
+                onIncoming={onIncoming}
+              />
             </div>
             <div className="side-panel" hidden={sideTab !== "members"}>
-              <MembersPanel room={room} />
+              <MembersPanel room={room} online={presence.users} />
             </div>
             <div className="side-panel" hidden={sideTab !== "music"}>
               <MusicPanel roomId={room.id} />

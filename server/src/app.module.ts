@@ -7,6 +7,7 @@ import { DocumentModule } from './document/document.module.js';
 import { SocketModule } from './socket/socket.module.js';
 import { AiModule } from './ai/ai.module.js';
 import { AnalysisModule } from './analysis/analysis.module.js';
+import { ChatModule } from './chat/chat.module.js';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { AnalysisModule } from './analysis/analysis.module.js';
     SocketModule,
     AiModule,
     AnalysisModule,
+    ChatModule,
   ],
   controllers: [AppController],
   providers: [AppService],
